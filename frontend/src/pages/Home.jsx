@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import { io } from "socket.io-client";
+import Video from "../components/Video";
 const socket = io("http://localhost:5000");
 
 const Home = () => {
@@ -9,10 +10,15 @@ const Home = () => {
   const [messages, setMessages] = useState([]);
   const [connectedUsers, setConnectedUsers] = useState([]);
   const [matching, setMatching] = useState(false);
+  const [whoStopped, setWhoStopped] = useState("");
   const [strangerTyping, setStrangerTyping] = useState(false);
   const inputRef = useRef();
 
   useEffect(() => {
+    socket.on("connect", () => {
+      console.log("Connected");
+    });
+
     socket.on("msg", (data) => {
       setMessages((prev) => [...prev, data]);
     });
@@ -20,6 +26,7 @@ const Home = () => {
     socket.on("pair", (user) => {
       setMatching(false);
       setTo(user);
+      inputRef.current.focus();
     });
 
     socket.on("typing", () => {
@@ -33,16 +40,17 @@ const Home = () => {
       setConnectedUsers(users);
     });
 
-    socket.on("disconnect", () => {
-      console.log("disconnected");
-    });
-
     socket.on("stop", () => {
       setTo("");
       setMessages([]);
       setMatching(false);
+      setWhoStopped("Stranger");
     });
   }, []);
+
+  useEffect(() => {
+    inputRef.current.focus();
+  }, [to]);
 
   const send = () => {
     if (message !== "") {
@@ -74,7 +82,9 @@ const Home = () => {
         from: socket.id,
         to: to,
       });
+      setWhoStopped("You");
       setTo("");
+      setMessage("");
       setMessages([]);
       setMatching(false);
     }
@@ -88,13 +98,15 @@ const Home = () => {
       to: to,
     });
   };
+
   return (
     <>
       <Navbar />
 
       <div className="p-2 pb-3 w-full min-h-[calc(100vh-70px)] flex gap-1">
         <div className="min-w-[30vw] border rounded-md hidden md:block">
-          videio chat
+          {/* <Video socket={socket} />  */}
+          Video Call - TODO
         </div>
 
         <div className="flex flex-col w-full gap-1">
@@ -112,12 +124,19 @@ const Home = () => {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 w-full h-full justify-center">
+              <div className="flex flex-col items-center gap-1 w-full h-full justify-center">
+                {whoStopped !== "" && (
+                  <div className="flex items-end gap-1 text-red-600">
+                    <span className="text-sm font-semibold">
+                      {whoStopped} disconnected
+                    </span>
+                  </div>
+                )}
                 <button
                   className="w-[200px] px-3 py-2 rounded-md bg-sky-500 text-white font-semibold"
                   onClick={startStopMessaging}
                 >
-                  Connect to a stranger (Esc)
+                  Connect to a stranger
                 </button>
               </div>
             )}
@@ -164,6 +183,10 @@ const Home = () => {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   send();
+                }
+
+                if (e.key === "Escape") {
+                  startStopMessaging();
                 }
               }}
               disabled={matching}
